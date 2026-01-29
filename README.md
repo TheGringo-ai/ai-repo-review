@@ -1,109 +1,114 @@
-# AI Repo Review Tool
+# AI Repo Review
 
-A static analysis tool that uses AI to review code repositories and generate reports on code quality, potential issues, and improvement suggestions.
+A static analysis tool for Python repositories. Detects security issues, code quality problems, and deprecated patterns.
 
-## What This Does
+## What It Does
 
-- **Repository Analysis**: Scans source code files in a repository to identify patterns, structures, and potential problems.
-- **Issue Identification**: Detects common code smells, potential bugs, security concerns, and maintainability issues.
-- **Report Generation**: Produces structured reports summarizing findings with severity levels and file locations.
-- **Multi-Language Support**: Analyzes repositories containing code in multiple programming languages.
+| Category | Detects |
+|----------|---------|
+| **Security** | Hardcoded secrets, API keys, .env files, eval/exec usage, pickle vulnerabilities |
+| **Code Quality** | Bare except clauses, deprecated datetime.utcnow(), missing type hints |
+| **Dependencies** | Outdated packages, known CVEs (planned) |
 
-## What This Does NOT Do
+## What It Does NOT Do
 
-- **No Code Execution**: This tool performs static analysis only. It does not run, compile, or execute any code from the analyzed repository.
-- **No Automated Pull Requests**: The tool generates reports but does not create, modify, or submit pull requests or commits.
-- **No Authentication Storage**: The tool does not store credentials, tokens, or authentication information between sessions.
-- **No Data Retention**: Analysis results are not retained after the session ends. Each analysis is independent and ephemeral.
-- **No External Network Calls**: The tool does not send repository data to external services beyond the configured AI provider.
+- **No code execution** — static analysis only
+- **No external calls** — all analysis runs locally
+- **No data retention** — results are ephemeral
+- **No auto-fixes** — reports findings for human review
+
+## Case Study: ChatterFix
+
+Used this tool to audit a production CMMS application:
+
+| Metric | Before | After | Result |
+|--------|--------|-------|--------|
+| Total findings | 27 | 11 | **-59%** |
+| Critical | 0 | 0 | — |
+| High | 12 | 7 | -5 |
+| Low | 13 | 2 | -11 |
+
+**16 real issues fixed** including:
+- Bare `except:` clauses → specific exception types
+- `datetime.utcnow()` → `datetime.now(timezone.utc)`
+- Hardcoded bearer tokens → environment variables
+
+**11 findings remain** — all documented as:
+- False positives (string patterns in code analyzers)
+- Intentional design (eval/exec in code reviewer tool)
+- Safe by design (public Firebase API keys)
 
 ## Installation
 
-### Prerequisites
-
-- Python 3.9 or higher
-- pip package manager
-
-### Steps
-
 ```bash
-# Clone the repository
-git clone https://github.com/your-org/ai-repo-review.git
+git clone https://github.com/TheGringo-ai/ai-repo-review.git
 cd ai-repo-review
-
-# Create a virtual environment
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-
-# Install dependencies
 pip install -r requirements.txt
-
-# Set up environment variables
-cp .env.example .env
-# Edit .env with your AI provider API key
 ```
 
 ## Usage
 
-### Command Line Interface
+### Python API
 
-```bash
-# Analyze a local repository
-python -m ai_repo_review /path/to/repository
+```python
+from review import detect_stack, run_all_analyzers
 
-# Analyze with specific output format
-python -m ai_repo_review /path/to/repository --format json
+repo_path = "/path/to/repository"
+stack_info = detect_stack(repo_path)
+results = run_all_analyzers(repo_path, stack_info)
 
-# Analyze specific file types only
-python -m ai_repo_review /path/to/repository --include "*.py,*.js"
-
-# Save report to file
-python -m ai_repo_review /path/to/repository --output report.md
+for category, findings in results.items():
+    print(f"{category}: {len(findings)} findings")
 ```
 
 ### Web Interface
 
 ```bash
-# Start the web server
-python -m ai_repo_review --web
-
-# Access the interface at http://localhost:8000
+uvicorn app.main:app --port 8001
+# Open http://localhost:8001
 ```
 
-The web interface allows you to:
-- Upload or specify a repository path
-- Configure analysis options
-- View reports in a formatted display
-- Export reports in various formats
+## Understanding Results
 
-### Configuration Options
+### Severity Levels
 
-| Option | Description | Default |
-|--------|-------------|---------|
-| `--format` | Output format (text, json, markdown) | text |
-| `--include` | File patterns to include | all supported |
-| `--exclude` | File patterns to exclude | none |
-| `--output` | Output file path | stdout |
-| `--severity` | Minimum severity to report (low, medium, high) | low |
-| `--web` | Start web interface | false |
-| `--port` | Web server port | 8000 |
+| Level | Meaning | Action |
+|-------|---------|--------|
+| **Critical** | Exploitable vulnerability | Fix immediately |
+| **High** | Security risk or major issue | Fix before deploy |
+| **Medium** | Code smell or potential problem | Review and decide |
+| **Low** | Style issue or deprecation | Fix when convenient |
 
-## Ethics and Responsible Use
+### Common False Positives
 
-This tool is intended for legitimate code review and quality assurance purposes. Users are expected to:
+| Finding | Why It's OK |
+|---------|-------------|
+| `.env` files | Local dev files in .gitignore |
+| Firebase API key in JS | Public by design (Firebase web config) |
+| `eval()` in code analyzer | Required for code analysis tools |
+| `pickle.load` | Performance caching with trusted data |
+| `except:` in string patterns | Detection rules, not actual code |
 
-- **Obtain Authorization**: Only analyze repositories you own or have explicit permission to review.
-- **Respect Privacy**: Do not use this tool to analyze private repositories without proper authorization.
-- **Review AI Output**: AI-generated findings should be reviewed by qualified developers before taking action. The tool may produce false positives or miss actual issues.
-- **No Malicious Use**: Do not use this tool to identify vulnerabilities in systems you do not have permission to test.
-- **Comply with Terms of Service**: Ensure your use complies with the terms of service of the AI provider and any code hosting platforms involved.
+## Project Structure
 
-The maintainers of this tool are not responsible for misuse or any damages resulting from the use of this software.
+```
+ai-repo-review/
+├── app/
+│   ├── main.py           # FastAPI app
+│   ├── routers/review.py # Web endpoints
+│   └── templates/        # HTML interface
+├── review/
+│   ├── cloner.py         # Git clone handling
+│   ├── detector.py       # Language/stack detection
+│   ├── analyzers.py      # Security & quality checks
+│   └── reporter.py       # Report generation
+└── requirements.txt
+```
 
 ## License
 
-MIT License. See LICENSE file for details.
+MIT
 
 ## Contributing
 
-Contributions are welcome. Please open an issue to discuss proposed changes before submitting a pull request.
+Issues and PRs welcome. Please open an issue before submitting large changes.
